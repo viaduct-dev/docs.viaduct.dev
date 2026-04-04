@@ -33,7 +33,7 @@ jobs:
       - name: Check if already built
         id: cache-check
         if: github.event_name == 'schedule'
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v5
         with:
           path: .build-marker
           key: upstream-${{ steps.sha.outputs.sha }}
@@ -57,7 +57,7 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
         with:
           repository: airbnb/viaduct
           ref: main
@@ -67,9 +67,9 @@ jobs:
           distribution: temurin
           java-version: '21'
 
-      - uses: gradle/actions/setup-gradle@v5
+      - uses: gradle/actions/setup-gradle@v6
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: '3.x'
           cache: pip
@@ -86,7 +86,7 @@ jobs:
       - name: Generate Dokka
         run: ./gradlew :core:tenant:tenant-api:dokkaGenerate :core:service:dokkaGenerate
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: site
           path: docs/site
@@ -98,9 +98,9 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@v5  # needed for lychee.toml
+      - uses: actions/checkout@v6  # needed for lychee.toml
 
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: site
           path: site
@@ -133,7 +133,7 @@ jobs:
       name: github-pages
       url: ${{ steps.deploy.outputs.page_url }}
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: site
           path: site
@@ -141,17 +141,17 @@ jobs:
       - name: Write CNAME
         run: echo "${SITE_URL#https://}" > site/CNAME
 
-      - uses: actions/upload-pages-artifact@v3
+      - uses: actions/upload-pages-artifact@v4
         with:
           path: site
 
       - id: deploy
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@v5
 
       - name: Mark upstream SHA as built
         run: mkdir -p .build-marker && touch .build-marker/ok
 
-      - uses: actions/cache/save@v4
+      - uses: actions/cache/save@v5
         with:
           path: .build-marker
           key: upstream-${{ needs.check-upstream.outputs.sha }}
