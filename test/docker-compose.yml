@@ -1,0 +1,20 @@
+services:
+  docs:
+    build:
+      context: .
+      args:
+        SITE_URL: ${SITE_URL:-http://localhost:8080}
+        SOURCE_REF: ${SOURCE_REF:-main}
+    ports:
+      - "8080:8080"
+
+  linkcheck:
+    image: lycheeverse/lychee:latest
+    command: --config /etc/lychee.toml --base-url http://docs:8080 --include-fragments http://docs:8080 http://docs:8080/apis/tenant-api/ http://docs:8080/apis/service/
+    volumes:
+      - ./lychee.toml:/etc/lychee.toml
+    depends_on:
+      docs:
+        condition: service_healthy
+    profiles:
+      - linkcheck

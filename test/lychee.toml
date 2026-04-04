@@ -1,0 +1,6 @@
+# Domains that block bots and will return 403/429, causing false CI failures
+exclude = [
+    "https://(www\\.)?linkedin\\.com",
+    "https://(www\\.)?twitter\\.com",
+    "https://x\\.com",
+]

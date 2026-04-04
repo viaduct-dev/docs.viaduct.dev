@@ -1,0 +1,157 @@
+name: Deploy Docs
+
+on:
+  push:
+    branches: [main]
+  schedule:
+    - cron: '0 6 * * 1'  # Weekly — skipped if upstream has no new commits
+  workflow_dispatch:
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+env:
+  SITE_URL: https://docs.viaduct.dev
+
+jobs:
+  check-upstream:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      sha: ${{ steps.sha.outputs.sha }}
+      skip: ${{ steps.skip.outputs.skip }}
+    steps:
+      - name: Get latest upstream SHA
+        id: sha
+        run: |
+          sha=$(curl -s -H "Authorization: Bearer ${{ github.token }}" \
+            https://api.github.com/repos/airbnb/viaduct/commits/main | jq -r .sha)
+          echo "sha=$sha" >> $GITHUB_OUTPUT
+
+      - name: Check if already built
+        id: cache-check
+        if: github.event_name == 'schedule'
+        uses: actions/cache/restore@v4
+        with:
+          path: .build-marker
+          key: upstream-${{ steps.sha.outputs.sha }}
+          lookup-only: true
+
+      - name: Set skip flag
+        id: skip
+        run: |
+          if [ "${{ github.event_name }}" != "schedule" ]; then
+            echo "skip=false" >> $GITHUB_OUTPUT
+          elif [ "${{ steps.cache-check.outputs.cache-hit }}" = "true" ]; then
+            echo "skip=true" >> $GITHUB_OUTPUT
+          else
+            echo "skip=false" >> $GITHUB_OUTPUT
+          fi
+
+  build:
+    needs: check-upstream
+    if: needs.check-upstream.outputs.skip == 'false'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          repository: airbnb/viaduct
+          ref: main
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - uses: gradle/actions/setup-gradle@v5
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+          cache: pip
+          cache-dependency-path: docs/requirements.txt
+
+      - name: Install Python deps
+        run: pip install -r docs/requirements.txt
+
+      - name: Build MkDocs
+        working-directory: docs
+        run: mkdocs build
+        # MkDocs cleans site/ before writing — must run before Dokka
+
+      - name: Generate Dokka
+        run: ./gradlew :core:tenant:tenant-api:dokkaGenerate :core:service:dokkaGenerate
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: site
+          path: docs/site
+
+  link-check:
+    needs: [check-upstream, build]
+    if: needs.check-upstream.outputs.skip == 'false'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v5  # needed for lychee.toml
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: site
+          path: site
+
+      - name: Serve site
+        run: python -m http.server 8080 --directory site &
+
+      - name: Wait for server
+        run: timeout 30 bash -c 'until curl -sf http://localhost:8080/ > /dev/null; do sleep 1; done'
+
+      - uses: lycheeverse/lychee-action@v2
+        with:
+          args: >
+            --config test/lychee.toml
+            --base-url http://localhost:8080
+            --include-fragments
+            http://localhost:8080
+            http://localhost:8080/apis/tenant-api/
+            http://localhost:8080/apis/service/
+          fail: true
+
+  deploy:
+    needs: [check-upstream, link-check]
+    if: needs.check-upstream.outputs.skip == 'false'
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: site
+          path: site
+
+      - name: Write CNAME
+        run: echo "${SITE_URL#https://}" > site/CNAME
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+      - id: deploy
+        uses: actions/deploy-pages@v4
+
+      - name: Mark upstream SHA as built
+        run: mkdir -p .build-marker && touch .build-marker/ok
+
+      - uses: actions/cache/save@v4
+        with:
+          path: .build-marker
+          key: upstream-${{ needs.check-upstream.outputs.sha }}
