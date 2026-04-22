@@ -169,6 +169,7 @@ nav:
     - Service API: 'https://docs.viaduct.dev/apis/service/'
 
 extra:
+  homepage: https://viaduct.airbnb.tech/
   social:
     - icon: fontawesome/brands/github
       link: https://github.com/airbnb/viaduct
