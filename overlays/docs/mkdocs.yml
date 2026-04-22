@@ -166,6 +166,7 @@ nav:
     - Architecture: docs/contributors/architecture/index.md
     - IDE Testing: docs/contributors/ide_testing/index.md
   - KDocs:
+    - kdocs/index.md
     - Tenant API: 'https://docs.viaduct.dev/apis/tenant-api/'
     - Service API: 'https://docs.viaduct.dev/apis/service/'
 
