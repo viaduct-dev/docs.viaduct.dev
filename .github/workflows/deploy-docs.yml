@@ -72,13 +72,6 @@ jobs:
       - name: Apply overlays
         run: cp -r deploy/overlays/. source/
 
-      - uses: actions/setup-java@v5
-        with:
-          distribution: temurin
-          java-version: '21'
-
-      - uses: gradle/actions/setup-gradle@v6
-
       - uses: actions/setup-python@v6
         with:
           python-version: '3.x'
@@ -87,6 +80,17 @@ jobs:
 
       - name: Install Python deps
         run: pip install -r source/docs/requirements.txt
+
+      - name: Generate nav
+        working-directory: source
+        run: python3 patch-mkdocs.py
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - uses: gradle/actions/setup-gradle@v6
 
       - name: Flatten docs/ subdirectory
         working-directory: source
@@ -103,9 +107,9 @@ jobs:
 
       - name: Generate Dokka
         working-directory: source
-        run: ./gradlew :core:tenant:tenant-api:dokkaGenerate :core:service:dokkaGenerate
+        run: ./gradlew :core:tenant:tenant-api:dokkaGenerate :core:service:dokkaGenerate --no-daemon
 
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@v4
         with:
           name: site
           path: source/docs/site
@@ -119,7 +123,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6  # needed for lychee.toml
 
-      - uses: actions/download-artifact@v8
+      - uses: actions/download-artifact@v4
         with:
           name: site
           path: site
@@ -152,7 +156,7 @@ jobs:
       name: github-pages
       url: ${{ steps.deploy.outputs.page_url }}
     steps:
-      - uses: actions/download-artifact@v8
+      - uses: actions/download-artifact@v4
         with:
           name: site
           path: site

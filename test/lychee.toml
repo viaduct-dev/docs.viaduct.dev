@@ -1,5 +1,9 @@
 # Domains that block bots and will return 403/429, causing false CI failures
+# docs.viaduct.dev is excluded because nav sidebar links point to production using absolute
+# URLs; the Dokka output is verified separately via the explicit http://localhost:8080 args
+# passed to lychee, so excluding the production hostname causes no coverage gap.
 exclude = [
+    "https://docs\\.viaduct\\.dev",
     "https://(www\\.)?linkedin\\.com",
     "https://(www\\.)?twitter\\.com",
     "https://x\\.com",

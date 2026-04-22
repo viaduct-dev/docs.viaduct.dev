@@ -8,7 +8,11 @@ import (
 func main() {
 	if len(os.Args) > 1 && os.Args[1] == "--health" {
 		resp, err := http.Get("http://localhost:8080/")
-		if err != nil || resp.StatusCode != 200 {
+		if err != nil {
+			os.Exit(1)
+		}
+		resp.Body.Close()
+		if resp.StatusCode != 200 {
 			os.Exit(1)
 		}
 		return
