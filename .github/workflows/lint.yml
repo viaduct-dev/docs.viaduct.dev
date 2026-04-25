@@ -1,0 +1,16 @@
+name: Lint
+
+on:
+  push:
+  workflow_dispatch:
+
+jobs:
+  ruff:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v6
+      - uses: astral-sh/ruff-action@v3
+        with:
+          args: check overlays/patch-mkdocs.py
