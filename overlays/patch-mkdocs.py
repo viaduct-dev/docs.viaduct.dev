@@ -6,12 +6,7 @@ Reads the upstream nav via git (before overlays replaced mkdocs.yml),
 extracts the Documentation section children, fixes paths flattened by
 the build, appends the KDocs section, and writes nav YAML to the end
 of the already-applied overlay mkdocs.yml.
-
-Also promotes the Getting Started index page to the site root (index.md)
-so that docs.viaduct.dev/ serves the Getting Started landing page directly.
 """
-import os
-import re
 import subprocess
 import sys
 import yaml
@@ -78,111 +73,6 @@ nav = fix_nav(doc_nav) + [{'KDocs': [
     {'Tenant API': 'https://docs.viaduct.dev/apis/tenant-api/'},
     {'Service API': 'https://docs.viaduct.dev/apis/service/'},
 ]}]
-
-# Promote the Getting Started index page to the site root so that
-# docs.viaduct.dev/ serves the Getting Started landing page directly.
-# The Getting Started nav entry will link to / (index.md) rather than
-# /getting_started/.
-
-def gs_index_path(section_value):
-    """Return the index page path for a nav section value (str or list)."""
-    if isinstance(section_value, str):
-        return section_value
-    if isinstance(section_value, list):
-        for item in section_value:
-            if isinstance(item, str):
-                return item
-            if isinstance(item, dict):
-                v = next(iter(item.values()))
-                if isinstance(v, str):
-                    return v
-    return None
-
-def remap_first(items, old_path, new_path):
-    """Replace first occurrence of old_path with new_path in nav tree.
-
-    Returns (new_items, found).
-    """
-    out = []
-    found = False
-    for item in items:
-        if found:
-            out.append(item)
-            continue
-        if isinstance(item, str):
-            if item == old_path:
-                out.append(new_path)
-                found = True
-            else:
-                out.append(item)
-        elif isinstance(item, dict):
-            new_dict = {}
-            for k, v in item.items():
-                if found:
-                    new_dict[k] = v
-                elif isinstance(v, str):
-                    if v == old_path:
-                        new_dict[k] = new_path
-                        found = True
-                    else:
-                        new_dict[k] = v
-                elif isinstance(v, list):
-                    new_v, sub_found = remap_first(v, old_path, new_path)
-                    new_dict[k] = new_v
-                    if sub_found:
-                        found = True
-                else:
-                    new_dict[k] = v
-            out.append(new_dict)
-        else:
-            out.append(item)
-    return out, found
-
-gs_path = None
-for item in nav:
-    if isinstance(item, dict) and 'Getting Started' in item:
-        gs_path = gs_index_path(item['Getting Started'])
-        break
-
-# Inline markdown link URLs: (url) or (url "title") or (url 'title')
-_LINK_RE = re.compile(r'\(([^\s)]+)((?:\s+"[^"]*"|\s+\'[^\']*\')?)\)')
-
-def _prefix_relative_links(content, prefix):
-    """Prepend prefix/ to every relative link URL in markdown content.
-
-    Leaves absolute URLs (http/https), root-relative paths (/…),
-    anchors (#…), and mailto: links untouched.
-    """
-    def _fix(m):
-        url, title = m.group(1), m.group(2)
-        if re.match(r'^(?:https?://|/|#|mailto:)', url):
-            return m.group(0)
-        return f'({prefix}/{url}{title})'
-    return _LINK_RE.sub(_fix, content)
-
-if gs_path and gs_path != 'index.md':
-    src = f'docs/docs/{gs_path}'
-    dst = 'docs/docs/index.md'
-    if os.path.exists(src):
-        with open(src) as f:
-            content = f.read()
-        gs_dir = os.path.dirname(gs_path)
-        if gs_dir:
-            # Relative links in the original file resolve correctly from its
-            # subdirectory. Once the file is moved to the root those same links
-            # would point to non-existent paths, breaking MkDocs resolution and
-            # producing .md hrefs in the output. Prefix them with the source
-            # directory so MkDocs can still find the targets.
-            content = _prefix_relative_links(content, gs_dir)
-        with open(dst, 'w') as f:
-            f.write(content)
-        nav, remapped = remap_first(nav, gs_path, 'index.md')
-        if remapped:
-            print(f"patch-mkdocs.py: promoted {gs_path} -> index.md")
-        else:
-            print(f"patch-mkdocs.py: WARNING — could not remap {gs_path} in nav", file=sys.stderr)
-    else:
-        print(f"patch-mkdocs.py: WARNING — {src} not found, root index unchanged", file=sys.stderr)
 
 nav_yaml = yaml.dump({'nav': nav}, default_flow_style=False, allow_unicode=True)
 
